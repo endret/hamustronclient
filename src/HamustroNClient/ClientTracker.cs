@@ -1,15 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
 using HamustroNClient.Core;
+using HamustroNClient.Infrastructure;
+using HamustroNClient.Model;
 using HamustroNClient.Security;
 
 namespace HamustroNClient
 {
     public class ClientTracker
     {
+        private readonly IPersistentStorage _persistentStorage;
         private static readonly Encoding StringEncoding = Encoding.UTF8;
 
         private readonly string _collectorUrl;
@@ -24,7 +26,7 @@ namespace HamustroNClient
         private readonly int _queueRetentionMinutes;
 
         private string _sessionId;
-        private uint _sessionSerial;
+        private long _sessionSerial;
 
         /// <summary>
         /// Initialize ClientTracker instance
@@ -78,7 +80,12 @@ namespace HamustroNClient
 
             this._queueRetentionMinutes = Math.Max(0, queueRetentionMinutes);
 
+            this._persistentStorage = DefaultPersistentStorageFactory();
         }
+
+        // TODO move into constructor as dependency
+        public static Func<IPersistentStorage> DefaultPersistentStorageFactory = () => new InMemoryPersistentStorage();
+        
 
         /// <summary>
         /// It will generate pre-populated information for new events so it should not be calculated on adding each event.
@@ -105,6 +112,7 @@ namespace HamustroNClient
         /// </summary>
         public void LoadCollections()
         {
+            // TODO 
             throw new NotImplementedException();
         }
 
@@ -127,6 +135,50 @@ namespace HamustroNClient
         public void TrackEvent(string eventName, int userId, string parameters, bool isTest = false)
         {
             eventName.Check(s => !string.IsNullOrWhiteSpace(s), "eventName");
+
+            var pb = Payload.CreateBuilder();
+
+            pb.At = DateTime.UtcNow.GetEpochUtc();
+
+            pb.Event = eventName;
+
+            pb.Nr = (uint)System.Threading.Interlocked.Increment(ref _sessionSerial);
+            
+            pb.UserId = (uint)userId;
+
+            // TODO implement logic
+            pb.Ip = "127.0.0.1";
+
+            pb.Parameters = parameters;
+
+            pb.IsTesting = isTest;
+
+            var cb = Collection.CreateBuilder();
+
+            cb.AddPayloads(pb.Build());
+
+            cb.ClientId = this._clientId;
+
+            cb.DeviceId = this._deviceId;
+
+            cb.Session = this._sessionId;
+
+            cb.SystemVersion = this._systemVersion;
+
+            cb.ProductVersion = this._productVersion;
+
+            cb.System = this._system;
+
+            cb.ProductGitHash = this._productGitHash;
+
+
+            this._persistentStorage.Add(new CollectionEntity
+            {
+                Collection = cb.Build()
+            });
+
+
+            // Trigger sending mechanism
         }
 
     }
