@@ -13,6 +13,5 @@ namespace HamustroNClient.Infrastructure
         IEnumerable<Model.CollectionEntity> Get();
 
         void Delete(CollectionEntity collectionEntity);
-
     }
 }

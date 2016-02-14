@@ -9,14 +9,30 @@ namespace HamustroNClient.Infrastructure
     /// <summary>
     /// InMemory persistent storage. Using for test ONLY!
     /// </summary>
-    internal class InMemoryPersistentStorage : IPersistentStorage
+    public class InMemoryPersistentStorage : IPersistentStorage
     {
-        private readonly IDictionary<Guid, CollectionEntity> _storage = new ConcurrentDictionary<Guid, CollectionEntity>();
+        private static object lck = new object();
+
+        private readonly IDictionary<string, CollectionEntity> _storage = new Dictionary<string, CollectionEntity>();
 
         public DateTime LastSyncDateTime { get; set; }
+        
         public void Add(CollectionEntity collectionEntity)
         {
-            _storage.Add(collectionEntity.Id, collectionEntity);
+            lock (lck)
+            {
+                if (_storage[collectionEntity.Id] != null)
+                {
+                    foreach (var ce in collectionEntity.Collection.PayloadsList)
+                    {
+                        _storage[collectionEntity.Id].Collection.PayloadsList.Add(ce);
+                    }
+                }
+                else
+                {
+                    _storage.Add(collectionEntity.Id, collectionEntity);
+                }
+            }
         }
 
         public IEnumerable<CollectionEntity> Get()
@@ -26,7 +42,10 @@ namespace HamustroNClient.Infrastructure
 
         public void Delete(CollectionEntity collectionEntity)
         {
-            _storage.Remove(collectionEntity.Id);
+            lock (lck)
+            {
+                _storage.Remove(collectionEntity.Id);
+            }
         }
     }
 }

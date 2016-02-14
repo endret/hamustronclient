@@ -6,15 +6,23 @@ using System.Threading.Tasks;
 
 namespace HamustroNClient.Model
 {
-    public class CollectionEntity
+    public class CollectionEntity : IEquatable<string>
     {
-        public CollectionEntity()
+        public CollectionEntity(string collectionId)
         {
-            this.Id = new Guid();
+            this.Id = collectionId;
+            this.Created = DateTime.UtcNow;
         }
 
-        public Guid Id { get; private set; }
+        public string Id { get; private set; }
+
+        public DateTime Created { get; private set; }
 
         public Collection Collection { get; set; }
+        
+        public bool Equals(string other)
+        {
+            return this.Id.ToLowerInvariant() == other.ToLowerInvariant();
+        }
     }
 }

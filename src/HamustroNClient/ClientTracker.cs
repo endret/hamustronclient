@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Text;
 using HamustroNClient.Core;
@@ -27,6 +29,14 @@ namespace HamustroNClient
 
         private string _sessionId;
         private long _sessionSerial;
+
+        private Uri CollectorUri
+        {
+            get
+            {
+                return new Uri(new Uri(this._collectorUrl), "/api/v1/track");
+            }
+        }
 
         /// <summary>
         /// Initialize ClientTracker instance
@@ -81,18 +91,21 @@ namespace HamustroNClient
             this._queueRetentionMinutes = Math.Max(0, queueRetentionMinutes);
 
             this._persistentStorage = DefaultPersistentStorageFactory();
+            
+            this._persistentStorage.LastSyncDateTime = DateTime.UtcNow;
         }
 
         // TODO move into constructor as dependency
         public static Func<IPersistentStorage> DefaultPersistentStorageFactory = () => new InMemoryPersistentStorage();
         
-
         /// <summary>
         /// It will generate pre-populated information for new events so it should not be calculated on adding each event.
         /// </summary>
         public void GenerateSession()
         {
-            // TODO ask should we persist these data
+            // TODO ask Bitu about this (is session unique?)
+
+            // TODO maintenance storage!
 
             // Generated as md5hex(device_id + ":" + client_id + ":" + system_version + ":" product_version)
 
@@ -112,24 +125,33 @@ namespace HamustroNClient
         /// </summary>
         public void LoadCollections()
         {
-            // TODO 
+            // TODO ask Bitu (why it's neccessary)
             throw new NotImplementedException();
         }
 
         /// <summary>
         /// events per session
         /// </summary>
-        public void LoadNumberPerSession()
+        public int LoadNumberPerSession()
         {
-            throw new NotImplementedException();
+            // TODO ask Bitu about this (per will session unique)
+
+            var cr = this._persistentStorage.Get().FirstOrDefault(c => c.Id == this._sessionId);
+
+            if (cr == null)
+            {
+                return 0;
+            }
+
+            return cr.Collection.PayloadsList.Count();
         }
 
         /// <summary>
         /// timestamp for events sent last time
         /// </summary>
-        public void LoadLastSyncTime()
+        public DateTime LoadLastSyncTime()
         {
-            throw new NotImplementedException();
+            return _persistentStorage.LastSyncDateTime;
         }
 
         public void TrackEvent(string eventName, int userId, string parameters, bool isTest = false)
@@ -146,16 +168,61 @@ namespace HamustroNClient
             
             pb.UserId = (uint)userId;
 
-            // TODO implement logic
+            // TODO implement ip reader logic
             pb.Ip = "127.0.0.1";
 
             pb.Parameters = parameters;
 
             pb.IsTesting = isTest;
 
-            var cb = Collection.CreateBuilder();
+            var cb = this.CreateCollection();
 
             cb.AddPayloads(pb.Build());
+            
+            this._persistentStorage.Add(new CollectionEntity(this._sessionId)
+            {
+                Collection = cb.Build()
+            });
+
+
+            // Trigger sending mechanism
+            this.SendItemsToCollector();
+        }
+
+        private void SendItemsToCollector()
+        {
+            if (_persistentStorage.LastSyncDateTime < DateTime.UtcNow.AddMinutes(-this._queueRetentionMinutes))
+            {
+                return;
+            }
+
+            if (_persistentStorage.Get().Sum(g => g.Collection.PayloadsCount) >= this._queueSize)
+            {
+                return;
+            }
+
+            foreach (var collectionEntity in this._persistentStorage.Get())
+            {
+                // TODO split collection by payloadcount
+
+                using (var httpClient = new HttpClient())
+                {
+                    var r = httpClient.PostAsync(this.CollectorUri, new ByteArrayContent(collectionEntity.Collection.ToByteArray())).Result;
+
+                    if (r.StatusCode == HttpStatusCode.OK)
+                    {
+                        _persistentStorage.Delete(collectionEntity);
+                    }
+                }
+
+                _persistentStorage.LastSyncDateTime = DateTime.UtcNow;
+            }
+
+        }
+
+        private Collection.Builder CreateCollection()
+        {
+            var cb = Collection.CreateBuilder();
 
             cb.ClientId = this._clientId;
 
@@ -170,16 +237,8 @@ namespace HamustroNClient
             cb.System = this._system;
 
             cb.ProductGitHash = this._productGitHash;
-
-
-            this._persistentStorage.Add(new CollectionEntity
-            {
-                Collection = cb.Build()
-            });
-
-
-            // Trigger sending mechanism
+            
+            return cb;
         }
-
     }
 }
