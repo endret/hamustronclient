@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.Threading.Tasks;
 using HamustroNClient.Core;
 using HamustroNClient.Infrastructure;
 using HamustroNClient.Model;
@@ -18,7 +19,7 @@ namespace HamustroNClient
 
         private readonly string _collectorUrl;
         private readonly string _sharedSecretKey;
-        private readonly string _deviceId;
+        private readonly string _deviceIdHash;
         private readonly string _clientId;
         private readonly string _systemVersion;
         private readonly string _productVersion;
@@ -43,7 +44,7 @@ namespace HamustroNClient
         /// </summary>
         /// <param name="collectorUrl">required, set from config</param>
         /// <param name="sharedSecretKey">required, set from config</param>
-        /// <param name="deviceId">required, please sha256 it.</param>
+        /// <param name="deviceId">required</param>
         /// <param name="clientId">required</param>
         /// <param name="systemVersion">required</param>
         /// <param name="productVersion"></param>
@@ -74,7 +75,7 @@ namespace HamustroNClient
 
             this._sharedSecretKey = sharedSecretKey;
 
-            this._deviceId = HashUtil.HashSha256ToString(StringEncoding.GetBytes(deviceId));
+            this._deviceIdHash = HashUtil.HashSha256ToString(StringEncoding.GetBytes(deviceId));
 
             this._clientId = clientId;
 
@@ -110,7 +111,7 @@ namespace HamustroNClient
             // Generated as md5hex(device_id + ":" + client_id + ":" + system_version + ":" product_version)
 
             var raw = String.Format("{0}:{1}:{2}:{3}",
-                this._deviceId,
+                this._deviceIdHash,
                 this._clientId,
                 this._systemVersion,
                 this._productVersion);
@@ -154,7 +155,7 @@ namespace HamustroNClient
             return _persistentStorage.LastSyncDateTime;
         }
 
-        public void TrackEvent(string eventName, int userId, string parameters, bool isTest = false)
+        public async Task TrackEvent(string eventName, int userId, string parameters, bool isTest = false)
         {
             eventName.Check(s => !string.IsNullOrWhiteSpace(s), "eventName");
 
@@ -186,10 +187,10 @@ namespace HamustroNClient
 
 
             // Trigger sending mechanism
-            this.SendItemsToCollector();
+            await this.SendItemsToCollector();
         }
 
-        private void SendItemsToCollector()
+        private async Task SendItemsToCollector()
         {
             if (_persistentStorage.LastSyncDateTime < DateTime.UtcNow.AddMinutes(-this._queueRetentionMinutes))
             {
@@ -207,7 +208,7 @@ namespace HamustroNClient
 
                 using (var httpClient = new HttpClient())
                 {
-                    var r = httpClient.PostAsync(this.CollectorUri, new ByteArrayContent(collectionEntity.Collection.ToByteArray())).Result;
+                    var r = await httpClient.PostAsync(this.CollectorUri, new ByteArrayContent(collectionEntity.Collection.ToByteArray()));
 
                     if (r.StatusCode == HttpStatusCode.OK)
                     {
@@ -226,7 +227,7 @@ namespace HamustroNClient
 
             cb.ClientId = this._clientId;
 
-            cb.DeviceId = this._deviceId;
+            cb.DeviceId = this._deviceIdHash;
 
             cb.Session = this._sessionId;
 
