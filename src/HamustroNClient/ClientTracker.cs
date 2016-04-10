@@ -14,8 +14,12 @@ namespace HamustroNClient
 {
     public class ClientTracker
     {
+        private const string ClientVersion = "0.1";
+
         private readonly IPersistentStorage _persistentStorage;
         private static readonly Encoding StringEncoding = Encoding.UTF8;
+
+        private static object _lckSessionSerial = new object();
 
         private readonly string _collectorUrl;
         private readonly string _sharedSecretKey;
@@ -29,7 +33,7 @@ namespace HamustroNClient
         private readonly int _queueRetentionMinutes;
 
         private string _sessionId;
-        private long _sessionSerial;
+        private uint _sessionSerial;
 
         private Uri CollectorUri
         {
@@ -56,8 +60,8 @@ namespace HamustroNClient
             string collectorUrl,
             string sharedSecretKey,
             string deviceId,
-            string clientId, 
-            string systemVersion, 
+            string clientId,
+            string systemVersion,
             string productVersion,
             string system,
             string productGitHash,
@@ -92,20 +96,18 @@ namespace HamustroNClient
             this._queueRetentionMinutes = Math.Max(0, queueRetentionMinutes);
 
             this._persistentStorage = DefaultPersistentStorageFactory();
-            
+
             this._persistentStorage.LastSyncDateTime = DateTime.UtcNow;
         }
 
         // TODO move into constructor as dependency
         public static Func<IPersistentStorage> DefaultPersistentStorageFactory = () => new InMemoryPersistentStorage();
-        
+
         /// <summary>
         /// It will generate pre-populated information for new events so it should not be calculated on adding each event.
         /// </summary>
         public void GenerateSession()
         {
-            // TODO ask Bitu about this (is session unique?)
-
             // TODO maintenance storage!
 
             // Generated as md5hex(device_id + ":" + client_id + ":" + system_version + ":" product_version)
@@ -120,7 +122,7 @@ namespace HamustroNClient
 
             this._sessionSerial = 1u;
         }
-        
+
         /// <summary>
         /// Loading information not sent events from persistent storage.
         /// </summary>
@@ -135,8 +137,6 @@ namespace HamustroNClient
         /// </summary>
         public int LoadNumberPerSession()
         {
-            // TODO ask Bitu about this (per will session unique)
-
             var cr = this._persistentStorage.Get().FirstOrDefault(c => c.Id == this._sessionId);
 
             if (cr == null)
@@ -165,11 +165,11 @@ namespace HamustroNClient
 
             pb.Event = eventName;
 
-            pb.Nr = (uint)System.Threading.Interlocked.Increment(ref _sessionSerial);
-            
+            pb.Nr = IncrementSerial(ref this._sessionSerial);
+
             pb.UserId = (uint)userId;
 
-            // TODO implement ip reader logic
+            // TODO implement ip resolver logic
             pb.Ip = "127.0.0.1";
 
             pb.Parameters = parameters;
@@ -179,7 +179,7 @@ namespace HamustroNClient
             var cb = this.CreateCollection();
 
             cb.AddPayloads(pb.Build());
-            
+
             this._persistentStorage.Add(new CollectionEntity(this._sessionId)
             {
                 Collection = cb.Build()
@@ -206,19 +206,31 @@ namespace HamustroNClient
             {
                 // TODO split collection by payloadcount
 
+                var ts = DateTime.UtcNow.GetEpochUtc();
+
+                var content = collectionEntity.Collection.ToByteArray();
+
                 using (var httpClient = new HttpClient())
                 {
-                    var r = await httpClient.PostAsync(this.CollectorUri, new ByteArrayContent(collectionEntity.Collection.ToByteArray()));
+                    httpClient.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("hamustroNClient", ClientVersion));
+
+                    httpClient.DefaultRequestHeaders.Add("Content-type", "application/protobuf");
+
+                    httpClient.DefaultRequestHeaders.Add("X-Hamustro-Time", ts.ToString());
+
+                    var sig = CalculateCollectorSignature(ts, content, this._sharedSecretKey);
+
+                    httpClient.DefaultRequestHeaders.Add("X-Hamustro-Signature", sig);
+
+                    var r = await httpClient.PostAsync(this.CollectorUri, new ByteArrayContent(content));
 
                     if (r.StatusCode == HttpStatusCode.OK)
                     {
                         _persistentStorage.Delete(collectionEntity);
+                        _persistentStorage.LastSyncDateTime = DateTime.UtcNow;
                     }
-                }
-
-                _persistentStorage.LastSyncDateTime = DateTime.UtcNow;
+                }               
             }
-
         }
 
         private Collection.Builder CreateCollection()
@@ -238,8 +250,46 @@ namespace HamustroNClient
             cb.System = this._system;
 
             cb.ProductGitHash = this._productGitHash;
-            
+
             return cb;
+        }
+
+        private static string CalculateCollectorSignature(ulong epochTimestamp, byte[] requestBody, string sharedKey)
+        {
+            // X-Hamustro-Signature: base64(sha256(X-Hamustro-Time + "|" + md5hex(request.body) + "|" + t.shared_secret_key))
+
+            var sb = new StringBuilder();
+
+            sb.Append(epochTimestamp);
+
+            sb.Append('|');
+
+            sb.Append(HashUtil.HashMd5ToString(requestBody));
+
+            sb.Append('|');
+
+            sb.Append(sharedKey);
+
+            var h = HashUtil.HashSha256(StringEncoding.GetBytes(sb.ToString()));
+
+            return Convert.ToBase64String(h);
+        }
+
+        private static uint IncrementSerial(ref uint i)
+        {
+            lock (_lckSessionSerial)
+            {
+                if (i == uint.MaxValue)
+                {
+                    i = 1U;
+                }
+                else
+                {
+                    i++;
+                }
+
+                return i;
+            }
         }
     }
 }
