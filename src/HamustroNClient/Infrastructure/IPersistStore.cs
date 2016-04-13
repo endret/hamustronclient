@@ -6,12 +6,12 @@ namespace HamustroNClient.Infrastructure
 {
     public interface IPersistentStorage
     {
-        DateTime LastSyncDateTime { get; set; }
+        DateTime? LastSyncDateTime { get; set; }
 
-        void Add(Model.CollectionEntity collectionEntity);
+        void Add(EventCollection eventCollection);
 
-        IEnumerable<Model.CollectionEntity> Get();
+        IEnumerable<EventCollection> Get();
 
-        void Delete(CollectionEntity collectionEntity);
+        void Delete(EventCollection eventCollection);
     }
 }

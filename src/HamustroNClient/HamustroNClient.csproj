@@ -40,7 +40,9 @@
     <Compile Include="Infrastructure\InMemoryPersistentStorage.cs" />
     <Compile Include="Infrastructure\IPersistStore.cs" />
     <Compile Include="Model\CollectionEntity.cs" />
-    <Compile Include="Model\Payload.cs" />
+    <Compile Include="Model\EventCollection.cs" />
+    <Compile Include="Model\_proto\Payload.cs" />
+    <Compile Include="Model\PayloadEntity.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Security\HashUtil.cs" />
   </ItemGroup>
@@ -59,7 +61,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Model\payload.proto" />
+    <None Include="Model\_proto\payload.proto" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

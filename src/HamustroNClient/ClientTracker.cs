@@ -9,6 +9,7 @@ using HamustroNClient.Core;
 using HamustroNClient.Infrastructure;
 using HamustroNClient.Model;
 using HamustroNClient.Security;
+using System.Collections.Generic;
 
 namespace HamustroNClient
 {
@@ -95,9 +96,7 @@ namespace HamustroNClient
 
             this._queueRetentionMinutes = Math.Max(0, queueRetentionMinutes);
 
-            this._persistentStorage = DefaultPersistentStorageFactory();
-
-            this._persistentStorage.LastSyncDateTime = DateTime.UtcNow;
+            this._persistentStorage = DefaultPersistentStorageFactory();            
         }
 
         // TODO move into constructor as dependency
@@ -112,7 +111,7 @@ namespace HamustroNClient
 
             // Generated as md5hex(device_id + ":" + client_id + ":" + system_version + ":" product_version)
 
-            var raw = String.Format("{0}:{1}:{2}:{3}",
+            var raw = string.Format("{0}:{1}:{2}:{3}",
                 this._deviceIdHash,
                 this._clientId,
                 this._systemVersion,
@@ -137,59 +136,56 @@ namespace HamustroNClient
         /// </summary>
         public int LoadNumberPerSession()
         {
-            var cr = this._persistentStorage.Get().FirstOrDefault(c => c.Id == this._sessionId);
+            var cr = this._persistentStorage.Get().FirstOrDefault(c => c.SessionId == this._sessionId);
 
             if (cr == null)
             {
                 return 0;
             }
 
-            return cr.Collection.PayloadsList.Count();
+            return cr.Collection.Payloads.Count();
         }
 
         /// <summary>
         /// timestamp for events sent last time
         /// </summary>
-        public DateTime LoadLastSyncTime()
+        public DateTime? LoadLastSyncTime()
         {
             return _persistentStorage.LastSyncDateTime;
         }
 
-        public async Task TrackEvent(string eventName, int userId, string parameters, bool isTest = false)
+        public async Task TrackEvent(string eventName, uint userId, string parameters, bool isTest = false)
         {
             eventName.Check(s => !string.IsNullOrWhiteSpace(s), "eventName");
 
-            var pb = Payload.CreateBuilder();
-
-            pb.At = DateTime.UtcNow.GetEpochUtc();
-
-            pb.Event = eventName;
-
-            pb.Nr = IncrementSerial(ref this._sessionSerial);
-
-            pb.UserId = (uint)userId;
-
-            // TODO implement ip resolver logic
-            pb.Ip = "127.0.0.1";
-
-            pb.Parameters = parameters;
-
-            pb.IsTesting = isTest;
-
-            var cb = this.CreateCollection();
-
-            cb.AddPayloads(pb.Build());
-
-            this._persistentStorage.Add(new CollectionEntity(this._sessionId)
+            var payload = new PayloadEntity
             {
-                Collection = cb.Build()
-            });
+                At = DateTime.UtcNow.GetEpochUtc(),
+                Event = eventName,
+                Nr = IncrementSerial(ref this._sessionSerial),
+                UserId = userId,
+                Ip = ResolveIp(),
+                Parameters = parameters,
+                IsTesting = isTest
+            };
 
+            var ce = this.CreateCollectionEntity(new List<PayloadEntity> { payload });
+
+            this._persistentStorage.Add(new EventCollection
+            {
+                SessionId = this._sessionId,
+                Collection = ce
+            });
 
             // Trigger sending mechanism
             await this.SendItemsToCollector();
         }
 
+        private string ResolveIp()
+        {
+            return "127.0.0.1";
+        }
+        
         private async Task SendItemsToCollector()
         {
             if (_persistentStorage.LastSyncDateTime < DateTime.UtcNow.AddMinutes(-this._queueRetentionMinutes))
@@ -197,7 +193,7 @@ namespace HamustroNClient
                 return;
             }
 
-            if (_persistentStorage.Get().Sum(g => g.Collection.PayloadsCount) >= this._queueSize)
+            if (_persistentStorage.Get().Sum(g => g.Collection.Payloads.Count) >= this._queueSize)
             {
                 return;
             }
@@ -208,7 +204,10 @@ namespace HamustroNClient
 
                 var ts = DateTime.UtcNow.GetEpochUtc();
 
-                var content = collectionEntity.Collection.ToByteArray();
+                // TODO set content
+                // var content = collectionEntity.Collection.ToByteArray();
+
+                var content = new byte[0];
 
                 using (var httpClient = new HttpClient())
                 {
@@ -233,25 +232,28 @@ namespace HamustroNClient
             }
         }
 
-        private Collection.Builder CreateCollection()
+        private CollectionEntity CreateCollectionEntity(List<PayloadEntity> payloads)
         {
-            var cb = Collection.CreateBuilder();
+            var result = new CollectionEntity
+            {
+                ClientId = this._clientId,
 
-            cb.ClientId = this._clientId;
+                DeviceId = this._deviceIdHash,
 
-            cb.DeviceId = this._deviceIdHash;
+                Session = this._sessionId,
 
-            cb.Session = this._sessionId;
+                SystemVersion = this._systemVersion,
 
-            cb.SystemVersion = this._systemVersion;
+                ProductVersion = this._productVersion,
 
-            cb.ProductVersion = this._productVersion;
+                System = this._system,
 
-            cb.System = this._system;
+                ProductGitHash = this._productGitHash,
 
-            cb.ProductGitHash = this._productGitHash;
+                Payloads = payloads
+            };
 
-            return cb;
+            return result;
         }
 
         private static string CalculateCollectorSignature(ulong epochTimestamp, byte[] requestBody, string sharedKey)

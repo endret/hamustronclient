@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,23 +7,22 @@ using System.Threading.Tasks;
 
 namespace HamustroNClient.Model
 {
-    public class CollectionEntity : IEquatable<string>
+    public class CollectionEntity
     {
-        public CollectionEntity(string collectionId)
-        {
-            this.Id = collectionId;
-            this.Created = DateTime.UtcNow;
-        }
+        public string DeviceId { get; set; }
 
-        public string Id { get; private set; }
+        public string ClientId { get; set; }
 
-        public DateTime Created { get; private set; }
+        public string Session { get; set; }
 
-        public Collection Collection { get; set; }
-        
-        public bool Equals(string other)
-        {
-            return this.Id.ToLowerInvariant() == other.ToLowerInvariant();
-        }
-    }
+        public string SystemVersion { get; set; }
+
+        public string ProductVersion { get; set; }
+
+        public string System { get; set; }
+
+        public string ProductGitHash { get; set; }
+
+        public List<PayloadEntity> Payloads { get; set; }
+    }    
 }

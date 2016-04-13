@@ -13,38 +13,38 @@ namespace HamustroNClient.Infrastructure
     {
         private static object lck = new object();
 
-        private readonly IDictionary<string, CollectionEntity> _storage = new Dictionary<string, CollectionEntity>();
+        private readonly IDictionary<string, EventCollection> _storage = new Dictionary<string, EventCollection>();
 
-        public DateTime LastSyncDateTime { get; set; }
+        public DateTime? LastSyncDateTime { get; set; }
         
-        public void Add(CollectionEntity collectionEntity)
+        public void Add(EventCollection eventCollection)
         {
             lock (lck)
             {
-                if (_storage[collectionEntity.Id] != null)
+                if (_storage[eventCollection.SessionId] != null)
                 {
-                    foreach (var ce in collectionEntity.Collection.PayloadsList)
+                    foreach (var ce in eventCollection.Collection.Payloads)
                     {
-                        _storage[collectionEntity.Id].Collection.PayloadsList.Add(ce);
+                        _storage[eventCollection.SessionId].Collection.Payloads.Add(ce);
                     }
                 }
                 else
                 {
-                    _storage.Add(collectionEntity.Id, collectionEntity);
+                    _storage.Add(eventCollection.SessionId, eventCollection);
                 }
             }
         }
 
-        public IEnumerable<CollectionEntity> Get()
+        public IEnumerable<EventCollection> Get()
         {
             return _storage.Values;
         }
 
-        public void Delete(CollectionEntity collectionEntity)
+        public void Delete(EventCollection eventCollection)
         {
             lock (lck)
             {
-                _storage.Remove(collectionEntity.Id);
+                _storage.Remove(eventCollection.SessionId);
             }
         }
     }
