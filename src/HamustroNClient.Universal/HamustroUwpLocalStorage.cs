@@ -39,7 +39,7 @@ namespace HamustroNClient.Universal
             }
         }
 
-        public async Task Add(EventCollection eventCollection)
+        public async Task Add(SessionCollection eventCollection)
         {
             CollectionLock.EnterWriteLock();
 
@@ -47,9 +47,9 @@ namespace HamustroNClient.Universal
             {
                 var cf = await GetCollectionsRoot();
 
-                var collection = await GetItemFromStorage<EventCollection>(cf, eventCollection.SessionId);
+                var collection = await GetItemFromStorage<SessionCollection>(cf, eventCollection.SessionId);
 
-                if (collection == default(EventCollection))
+                if (collection == default(SessionCollection))
                 {
                     await SetItemToStorage(cf, eventCollection.SessionId, eventCollection);
                 }
@@ -60,7 +60,7 @@ namespace HamustroNClient.Universal
             }
         }
 
-        public async Task Delete(EventCollection eventCollection)
+        public async Task Delete(SessionCollection eventCollection)
         {
             CollectionLock.EnterWriteLock();
 
@@ -81,7 +81,7 @@ namespace HamustroNClient.Universal
             }
         }
 
-        public async Task<IEnumerable<EventCollection>> Get()
+        public async Task<IEnumerable<SessionCollection>> Get()
         {
             CollectionLock.EnterReadLock();
 
@@ -91,7 +91,7 @@ namespace HamustroNClient.Universal
 
                 var files = await cf.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByDate);
 
-                return await Task.WhenAll(files.Select(async f => await DeSerializeFile<EventCollection>(f)));
+                return await Task.WhenAll(files.Select(async f => await DeSerializeFile<SessionCollection>(f)));
             }
             finally
             {

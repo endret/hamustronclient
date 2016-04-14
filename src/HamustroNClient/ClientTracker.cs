@@ -37,15 +37,6 @@ namespace HamustroNClient
         private string _sessionId;
         private uint _sessionSerial;
 
-        [Obsolete]
-        private Uri CollectorUri
-        {
-            get
-            {
-                return new Uri(new Uri(this._collectorUrl), "/api/v1/track");
-            }
-        }
-
         /// <summary>
         /// Initialize ClientTracker instance
         /// </summary>
@@ -70,6 +61,48 @@ namespace HamustroNClient
             string productGitHash,
             int queueSize = 20,
             int queueRetentionMinutes = 1440
+            ) : this(
+                collectorUrl,
+                sharedSecretKey,
+                deviceId,
+                clientId,
+                systemVersion,
+                productVersion,
+                system,
+                productGitHash,
+                queueSize,
+                queueRetentionMinutes,
+                new InMemoryPersistentStorage(),
+                new ProtoHttpEventPublisher(collectorUrl))
+        {
+        }
+
+        /// <summary>
+        /// Initialize ClientTracker instance
+        /// </summary>
+        /// <param name="collectorUrl">required, set from config</param>
+        /// <param name="sharedSecretKey">required, set from config</param>
+        /// <param name="deviceId">required</param>
+        /// <param name="clientId">required</param>
+        /// <param name="systemVersion">required</param>
+        /// <param name="productVersion"></param>
+        /// <param name="system"></param>
+        /// <param name="productGitHash"></param>
+        /// <param name="queueSize">default: 20</param>
+        /// <param name="queueRetentionMinutes">default: 1440 (minutes = 24 hours)</param>
+        public ClientTracker(
+            string collectorUrl,
+            string sharedSecretKey,
+            string deviceId,
+            string clientId,
+            string systemVersion,
+            string productVersion,
+            string system,
+            string productGitHash,
+            int queueSize,
+            int queueRetentionMinutes,
+            IPersistentStorage persistentStorage,
+            IEventPublisher eventPublisher
             )
         {
             collectorUrl.Check(s => !string.IsNullOrWhiteSpace(s), "collectorUrl");
@@ -98,13 +131,11 @@ namespace HamustroNClient
 
             this._queueRetentionMinutes = Math.Max(0, queueRetentionMinutes);
 
-            // TODO move into constructor as dependency
-            this._persistentStorage = new InMemoryPersistentStorage();
+            this._persistentStorage = persistentStorage;
 
-            // TODO move into constructor as dependency
-            this._eventPublisher = new ProtoHttpEventPublisher(collectorUrl);  
+            this._eventPublisher = eventPublisher;
         }
-                
+
         /// <summary>
         /// It will generate pre-populated information for new events so it should not be calculated on adding each event.
         /// </summary>
@@ -190,7 +221,7 @@ namespace HamustroNClient
         {
             return "127.0.0.1";
         }
-        
+
         private async Task SendItemsToCollector()
         {
             if (_persistentStorage.LastSyncDateTime < DateTime.UtcNow.AddMinutes(-this._queueRetentionMinutes))

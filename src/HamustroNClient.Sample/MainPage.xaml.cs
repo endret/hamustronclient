@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.Networking;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -44,7 +45,17 @@ namespace HamustroNClient.Sample
         
         private async void Send()
         {
-            await tracker.TrackEvent(eventName.Text, 123u, "params", true);
+            var hosts = Windows.Networking.Connectivity.NetworkInformation.GetHostNames();
+
+            foreach (var aName in hosts)
+            {
+                if (aName.Type == HostNameType.Ipv4)
+                {
+                    await Task.Delay(1);
+                }
+            }
+
+            //await tracker.TrackEvent(eventName.Text, 123u, "params", true);
         }       
     }
 }
