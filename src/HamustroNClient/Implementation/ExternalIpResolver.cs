@@ -16,7 +16,7 @@ namespace HamustroNClient.Implementation
         {
             using (var httpClient = new HttpClient())
             {
-                return await httpClient.GetStringAsync(Url);
+                return await httpClient.GetStringAsync(Url);                             
             }
         }       
     }

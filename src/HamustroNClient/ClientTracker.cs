@@ -18,11 +18,8 @@ namespace HamustroNClient
     {
         private readonly IPersistentStorage _persistentStorage;
         private readonly IEventPublisher _eventPublisher;
-
-        private static readonly Encoding StringEncoding = Encoding.UTF8;
-
-        private static readonly object LckSessionSerial = new object();
-
+        private readonly IIpResolver _ipResolver;
+        
         private readonly string _collectorUrl;
         private readonly string _sharedSecretKey;
         private readonly string _deviceIdHash;
@@ -33,9 +30,15 @@ namespace HamustroNClient
         private readonly string _productGitHash;
         private readonly int _queueSize;
         private readonly int _queueRetentionMinutes;
-
         private string _sessionId;
         private uint _sessionSerial;
+
+        private static readonly Encoding StringEncoding = Encoding.UTF8;
+
+        private static readonly object LckSessionSerial = new object();
+
+        private static string IpCache;
+        private static DateTime? LastIpCache;
 
         /// <summary>
         /// Initialize ClientTracker instance
@@ -73,7 +76,8 @@ namespace HamustroNClient
                 queueSize,
                 queueRetentionMinutes,
                 new InMemoryPersistentStorage(),
-                new ProtoHttpEventPublisher(collectorUrl))
+                new ProtoHttpEventPublisher(collectorUrl),
+                new ExternalIpResolver())
         {
         }
 
@@ -102,7 +106,8 @@ namespace HamustroNClient
             int queueSize,
             int queueRetentionMinutes,
             IPersistentStorage persistentStorage,
-            IEventPublisher eventPublisher
+            IEventPublisher eventPublisher,
+            IIpResolver ipResolver
             )
         {
             collectorUrl.Check(s => !string.IsNullOrWhiteSpace(s), "collectorUrl");
@@ -134,6 +139,8 @@ namespace HamustroNClient
             this._persistentStorage = persistentStorage;
 
             this._eventPublisher = eventPublisher;
+
+            this._ipResolver = ipResolver;
         }
 
         /// <summary>
@@ -199,11 +206,12 @@ namespace HamustroNClient
                 At = DateTime.UtcNow.GetEpochUtc(),
                 Event = eventName,
                 Nr = IncrementSerial(ref this._sessionSerial),
-                UserId = userId,
-                Ip = ResolveIp(),
+                UserId = userId,                
                 Parameters = parameters,
                 IsTesting = isTest
             };
+
+            payload.Ip = await GetIp();
 
             var ce = this.CreateCollectionEntity(new List<PayloadEntity> { payload });
 
@@ -217,9 +225,19 @@ namespace HamustroNClient
             await this.SendItemsToCollector();
         }
 
-        private string ResolveIp()
+        private async Task<string> GetIp()
         {
-            return "127.0.0.1";
+            // TODO discuss with Bitu about this (collect or publish is important)
+            
+            // TODO move TTL into config            
+            if (LastIpCache == null || LastIpCache.Value < DateTime.UtcNow.AddMinutes(-10d))
+            {
+                IpCache = await this._ipResolver.GetIp();
+                LastIpCache = DateTime.UtcNow;
+            }
+
+            return IpCache;
+
         }
 
         private async Task SendItemsToCollector()
