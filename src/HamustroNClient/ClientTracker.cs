@@ -254,6 +254,8 @@ namespace HamustroNClient
                 return;
             }
 
+            bool wasSuccessPublish = false;
+
             // TODO paralell run
             foreach (var eventCollection in repo)
             {
@@ -262,7 +264,13 @@ namespace HamustroNClient
                 if (isSuccess)
                 {
                     await _persistentStorage.Delete(eventCollection);
+                    wasSuccessPublish = true;
                 }
+            }
+
+            if (wasSuccessPublish)
+            {
+                _persistentStorage.LastSyncDateTime = DateTime.UtcNow;
             }
         }
 
