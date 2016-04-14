@@ -2,7 +2,7 @@
 
 namespace HamustroNClient.Model
 {
-    public class EventCollection
+    public class SessionCollection
     {
         public string SessionId { get; set; }
 
@@ -10,7 +10,7 @@ namespace HamustroNClient.Model
 
         public override bool Equals(object obj)
         {
-            var ec = obj as EventCollection;
+            var ec = obj as SessionCollection;
 
             if (ec == null) return false;
 

@@ -12,42 +12,42 @@ namespace HamustroNClient.Infrastructure
     /// </summary>
     public class InMemoryPersistentStorage : IPersistentStorage
     {
-        private static object lck = new object();
+        private static readonly object Lck = new object();
 
-        private readonly IDictionary<string, EventCollection> _storage = new Dictionary<string, EventCollection>();
+        private readonly IDictionary<string, SessionCollection> _storage = new Dictionary<string, SessionCollection>();
 
         public DateTime? LastSyncDateTime { get; set; }
         
-        public Task Add(EventCollection eventCollection)
+        public Task Add(SessionCollection sessionCollection)
         {
-            lock (lck)
+            lock (Lck)
             {
-                if (_storage.ContainsKey(eventCollection.SessionId))
+                if (_storage.ContainsKey(sessionCollection.SessionId))
                 {
-                    foreach (var ce in eventCollection.Collection.Payloads)
+                    foreach (var ce in sessionCollection.Collection.Payloads)
                     {
-                        _storage[eventCollection.SessionId].Collection.Payloads.Add(ce);
+                        _storage[sessionCollection.SessionId].Collection.Payloads.Add(ce);
                     }
                 }
                 else
                 {
-                    _storage.Add(eventCollection.SessionId, eventCollection);
+                    _storage.Add(sessionCollection.SessionId, sessionCollection);
                 }
             }
 
             return Task.FromResult(0);
         }
 
-        public Task<IEnumerable<EventCollection>> Get()
+        public Task<IEnumerable<SessionCollection>> Get()
         {
             return Task.FromResult(_storage.Values.AsEnumerable());
         }
 
-        public Task Delete(EventCollection eventCollection)
+        public Task Delete(SessionCollection sessionCollection)
         {
-            lock (lck)
+            lock (Lck)
             {
-                _storage.Remove(eventCollection.SessionId);
+                _storage.Remove(sessionCollection.SessionId);
             }
 
             return Task.FromResult(0);

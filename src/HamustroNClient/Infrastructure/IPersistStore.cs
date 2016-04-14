@@ -9,10 +9,10 @@ namespace HamustroNClient.Infrastructure
     {
         DateTime? LastSyncDateTime { get; set; }
 
-        Task Add(EventCollection eventCollection);
+        Task Add(SessionCollection sessionCollection);
 
-        Task<IEnumerable<EventCollection>> Get();
+        Task<IEnumerable<SessionCollection>> Get();
 
-        Task Delete(EventCollection eventCollection);
+        Task Delete(SessionCollection sessionCollection);
     }
 }

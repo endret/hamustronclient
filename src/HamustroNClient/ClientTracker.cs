@@ -10,19 +10,18 @@ using HamustroNClient.Infrastructure;
 using HamustroNClient.Model;
 using HamustroNClient.Security;
 using System.Collections.Generic;
+using HamustroNClient.Implementation;
 
 namespace HamustroNClient
 {
     public class ClientTracker
     {
-        private const string ClientVersion = "0.1";
-
         private readonly IPersistentStorage _persistentStorage;
         private readonly IEventPublisher _eventPublisher;
 
         private static readonly Encoding StringEncoding = Encoding.UTF8;
 
-        private static object _lckSessionSerial = new object();
+        private static readonly object LckSessionSerial = new object();
 
         private readonly string _collectorUrl;
         private readonly string _sharedSecretKey;
@@ -177,7 +176,7 @@ namespace HamustroNClient
 
             var ce = this.CreateCollectionEntity(new List<PayloadEntity> { payload });
 
-            await this._persistentStorage.Add(new EventCollection
+            await this._persistentStorage.Add(new SessionCollection
             {
                 SessionId = this._sessionId,
                 Collection = ce
@@ -265,7 +264,7 @@ namespace HamustroNClient
 
         private static uint IncrementSerial(ref uint i)
         {
-            lock (_lckSessionSerial)
+            lock (LckSessionSerial)
             {
                 if (i == uint.MaxValue)
                 {
