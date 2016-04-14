@@ -18,6 +18,8 @@ namespace HamustroNClient
         private const string ClientVersion = "0.1";
 
         private readonly IPersistentStorage _persistentStorage;
+        private readonly IEventPublisher _eventPublisher;
+
         private static readonly Encoding StringEncoding = Encoding.UTF8;
 
         private static object _lckSessionSerial = new object();
@@ -36,6 +38,7 @@ namespace HamustroNClient
         private string _sessionId;
         private uint _sessionSerial;
 
+        [Obsolete]
         private Uri CollectorUri
         {
             get
@@ -96,12 +99,13 @@ namespace HamustroNClient
 
             this._queueRetentionMinutes = Math.Max(0, queueRetentionMinutes);
 
-            this._persistentStorage = DefaultPersistentStorageFactory();            
+            // TODO move into constructor as dependency
+            this._persistentStorage = new InMemoryPersistentStorage();
+
+            // TODO move into constructor as dependency
+            this._eventPublisher = new ProtoHttpEventPublisher(collectorUrl);  
         }
-
-        // TODO move into constructor as dependency
-        public static Func<IPersistentStorage> DefaultPersistentStorageFactory = () => new InMemoryPersistentStorage();
-
+                
         /// <summary>
         /// It will generate pre-populated information for new events so it should not be calculated on adding each event.
         /// </summary>
@@ -119,7 +123,7 @@ namespace HamustroNClient
 
             this._sessionId = HashUtil.HashMd5ToString(StringEncoding.GetBytes(raw));
 
-            this._sessionSerial = 1u;
+            this._sessionSerial = 0u;
         }
 
         /// <summary>
@@ -134,16 +138,18 @@ namespace HamustroNClient
         /// <summary>
         /// events per session
         /// </summary>
-        public int LoadNumberPerSession()
+        public async Task<int> LoadNumberPerSession()
         {
-            var cr = this._persistentStorage.Get().FirstOrDefault(c => c.SessionId == this._sessionId);
+            var repo = await this._persistentStorage.Get();
 
-            if (cr == null)
+            var r = repo.SingleOrDefault(c => c.SessionId == this._sessionId);
+
+            if (r == null)
             {
                 return 0;
             }
 
-            return cr.Collection.Payloads.Count();
+            return r.Collection.Payloads.Count();
         }
 
         /// <summary>
@@ -171,13 +177,13 @@ namespace HamustroNClient
 
             var ce = this.CreateCollectionEntity(new List<PayloadEntity> { payload });
 
-            this._persistentStorage.Add(new EventCollection
+            await this._persistentStorage.Add(new EventCollection
             {
                 SessionId = this._sessionId,
                 Collection = ce
             });
 
-            // Trigger sending mechanism
+            // Trigger publish mechanism
             await this.SendItemsToCollector();
         }
 
@@ -193,42 +199,22 @@ namespace HamustroNClient
                 return;
             }
 
-            if (_persistentStorage.Get().Sum(g => g.Collection.Payloads.Count) >= this._queueSize)
+            var repo = await _persistentStorage.Get();
+
+            if (repo.Sum(g => g.Collection.Payloads.Count) <= this._queueSize)
             {
                 return;
             }
 
-            foreach (var collectionEntity in this._persistentStorage.Get())
+            // TODO paralell run
+            foreach (var eventCollection in repo)
             {
-                // TODO split collection by payloadcount
+                var isSuccess = await this._eventPublisher.Send(eventCollection, this._sharedSecretKey);
 
-                var ts = DateTime.UtcNow.GetEpochUtc();
-
-                // TODO set content
-                // var content = collectionEntity.Collection.ToByteArray();
-
-                var content = new byte[0];
-
-                using (var httpClient = new HttpClient())
+                if (isSuccess)
                 {
-                    httpClient.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("hamustroNClient", ClientVersion));
-
-                    httpClient.DefaultRequestHeaders.Add("Content-type", "application/protobuf");
-
-                    httpClient.DefaultRequestHeaders.Add("X-Hamustro-Time", ts.ToString());
-
-                    var sig = CalculateCollectorSignature(ts, content, this._sharedSecretKey);
-
-                    httpClient.DefaultRequestHeaders.Add("X-Hamustro-Signature", sig);
-
-                    var r = await httpClient.PostAsync(this.CollectorUri, new ByteArrayContent(content));
-
-                    if (r.StatusCode == HttpStatusCode.OK)
-                    {
-                        _persistentStorage.Delete(collectionEntity);
-                        _persistentStorage.LastSyncDateTime = DateTime.UtcNow;
-                    }
-                }               
+                    await _persistentStorage.Delete(eventCollection);
+                }
             }
         }
 

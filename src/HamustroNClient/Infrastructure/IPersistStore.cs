@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using HamustroNClient.Model;
+using System.Threading.Tasks;
 
 namespace HamustroNClient.Infrastructure
 {
@@ -8,10 +9,10 @@ namespace HamustroNClient.Infrastructure
     {
         DateTime? LastSyncDateTime { get; set; }
 
-        void Add(EventCollection eventCollection);
+        Task Add(EventCollection eventCollection);
 
-        IEnumerable<EventCollection> Get();
+        Task<IEnumerable<EventCollection>> Get();
 
-        void Delete(EventCollection eventCollection);
+        Task Delete(EventCollection eventCollection);
     }
 }

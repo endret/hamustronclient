@@ -2,6 +2,7 @@
 using System.Text;
 using HamustroNClient.Security;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Threading.Tasks;
 
 namespace HamustroNClient.Tests
 {
@@ -23,6 +24,22 @@ namespace HamustroNClient.Tests
 
             Assert.AreEqual(TestStringInValidSha256HexString, actual);
 
+        }      
+    }
+
+    [Ignore]
+    [TestClass]
+    public class MyClass
+    {
+        [TestMethod]
+        public async Task MyTestMethod2()
+        {
+            var ct = new ClientTracker("http://jhkljjhghj.sgdgs.sdfg.kf", "xxx", "123", "clientId", "systemVersion", "productVersion", "system", "gitHash", 0);
+
+
+            ct.GenerateSession();
+
+            await ct.TrackEvent("event1", 1u, "", true);
         }
     }
 }

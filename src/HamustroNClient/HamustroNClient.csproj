@@ -37,7 +37,9 @@
     <Compile Include="ClientTracker.cs" />
     <Compile Include="Core\DateTimeEx.cs" />
     <Compile Include="Core\ParamCheck.cs" />
+    <Compile Include="Infrastructure\IHttpMessageFormatter.cs" />
     <Compile Include="Infrastructure\InMemoryPersistentStorage.cs" />
+    <Compile Include="Infrastructure\IEventPublisher.cs" />
     <Compile Include="Infrastructure\IPersistStore.cs" />
     <Compile Include="Model\CollectionEntity.cs" />
     <Compile Include="Model\EventCollection.cs" />
@@ -64,9 +66,7 @@
     <None Include="Model\_proto\payload.proto" />
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="IO\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using HamustroNClient.Model;
+using System.Threading.Tasks;
 
 namespace HamustroNClient.Infrastructure
 {
@@ -17,11 +18,11 @@ namespace HamustroNClient.Infrastructure
 
         public DateTime? LastSyncDateTime { get; set; }
         
-        public void Add(EventCollection eventCollection)
+        public Task Add(EventCollection eventCollection)
         {
             lock (lck)
             {
-                if (_storage[eventCollection.SessionId] != null)
+                if (_storage.ContainsKey(eventCollection.SessionId))
                 {
                     foreach (var ce in eventCollection.Collection.Payloads)
                     {
@@ -33,19 +34,23 @@ namespace HamustroNClient.Infrastructure
                     _storage.Add(eventCollection.SessionId, eventCollection);
                 }
             }
+
+            return Task.FromResult(0);
         }
 
-        public IEnumerable<EventCollection> Get()
+        public Task<IEnumerable<EventCollection>> Get()
         {
-            return _storage.Values;
+            return Task.FromResult(_storage.Values.AsEnumerable());
         }
 
-        public void Delete(EventCollection eventCollection)
+        public Task Delete(EventCollection eventCollection)
         {
             lock (lck)
             {
                 _storage.Remove(eventCollection.SessionId);
             }
+
+            return Task.FromResult(0);
         }
     }
 }
