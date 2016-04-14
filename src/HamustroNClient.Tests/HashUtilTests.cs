@@ -34,12 +34,12 @@ namespace HamustroNClient.Tests
         [TestMethod]
         public async Task MyTestMethod2()
         {
-            var ct = new ClientTracker("http://jhkljjhghj.sgdgs.sdfg.kf", "xxx", "123", "clientId", "systemVersion", "productVersion", "system", "gitHash", 0);
+            var ct = new ClientTracker("http://139.59.132.108:8080", "xxx", "123", "clientId", "systemVersion", "productVersion", "system", "gitHash", 0);
 
 
             ct.GenerateSession();
 
-            await ct.TrackEvent("event1", 1u, "", true);
+            await ct.TrackEvent("Endre was here", 1u, "param1", true);
         }
     }
 }

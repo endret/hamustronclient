@@ -7,7 +7,9 @@ namespace HamustroNClient.Infrastructure
 {
     public interface IPersistentStorage
     {
-        DateTime? LastSyncDateTime { get; set; }
+        Task SetLastSyncDateTime(DateTime dateTime);
+
+        Task<DateTime?> GetLastSyncDateTime();
 
         Task Add(SessionCollection sessionCollection);
 

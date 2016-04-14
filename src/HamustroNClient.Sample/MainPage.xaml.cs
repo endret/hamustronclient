@@ -1,4 +1,5 @@
-﻿using System;
+﻿using HamustroNClient.Implementation;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,8 +26,10 @@ namespace HamustroNClient.Sample
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        HamustroNClient.ClientTracker tracker = new ClientTracker(
-            "http://46.101.208.202:8080",
+        const string collectorUri = "http://46.101.208.202:8080";
+
+        ClientTracker tracker = new ClientTracker(
+            collectorUri,
             "sharedSecretKey",
             "device01",
             "client01",
@@ -34,7 +37,11 @@ namespace HamustroNClient.Sample
             "1.0",
             "Szisztem",
             "GitHash",
-            0);
+            2,
+            1440,
+            new Universal.HamustroUwpLocalStorage(),
+            new ProtoHttpEventPublisher(collectorUri),
+            new ExternalIpResolver());
 
         public MainPage()
         {
@@ -44,18 +51,8 @@ namespace HamustroNClient.Sample
         }
         
         private async void Send()
-        {
-            var hosts = Windows.Networking.Connectivity.NetworkInformation.GetHostNames();
-
-            foreach (var aName in hosts)
-            {
-                if (aName.Type == HostNameType.Ipv4)
-                {
-                    await Task.Delay(1);
-                }
-            }
-
-            //await tracker.TrackEvent(eventName.Text, 123u, "params", true);
+        {            
+            await tracker.TrackEvent(eventName.Text, 123u, "params", true);
         }       
     }
 }

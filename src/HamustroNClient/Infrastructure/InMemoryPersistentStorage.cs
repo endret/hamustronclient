@@ -16,7 +16,7 @@ namespace HamustroNClient.Infrastructure
 
         private readonly IDictionary<string, SessionCollection> _storage = new Dictionary<string, SessionCollection>();
 
-        public DateTime? LastSyncDateTime { get; set; }
+        public static DateTime? LastSyncDateTime { get; set; }
         
         public Task Add(SessionCollection sessionCollection)
         {
@@ -51,6 +51,18 @@ namespace HamustroNClient.Infrastructure
             }
 
             return Task.FromResult(0);
+        }
+
+        public Task SetLastSyncDateTime(DateTime dateTime)
+        {
+            LastSyncDateTime = dateTime;
+
+            return Task.FromResult(0);
+        }
+
+        public Task<DateTime?> GetLastSyncDateTime()
+        {
+            return Task.FromResult(LastSyncDateTime);
         }
     }
 }

@@ -192,9 +192,9 @@ namespace HamustroNClient
         /// <summary>
         /// timestamp for events sent last time
         /// </summary>
-        public DateTime? LoadLastSyncTime()
+        public async Task<DateTime?> LoadLastSyncTime()
         {
-            return _persistentStorage.LastSyncDateTime;
+            return await _persistentStorage.GetLastSyncDateTime();
         }
 
         public async Task TrackEvent(string eventName, uint userId, string parameters, bool isTest = false)
@@ -215,7 +215,7 @@ namespace HamustroNClient
 
             var ce = this.CreateCollectionEntity(new List<PayloadEntity> { payload });
 
-            await this._persistentStorage.Add(new SessionCollection
+           await this._persistentStorage.Add(new SessionCollection
             {
                 SessionId = this._sessionId,
                 Collection = ce
@@ -242,17 +242,24 @@ namespace HamustroNClient
 
         private async Task SendItemsToCollector()
         {
-            if (_persistentStorage.LastSyncDateTime < DateTime.UtcNow.AddMinutes(-this._queueRetentionMinutes))
-            {
-                return;
-            }
+            IEnumerable<SessionCollection> repo = null;
 
-            var repo = await _persistentStorage.Get();
+            var ls = await _persistentStorage.GetLastSyncDateTime();           
 
-            if (repo.Sum(g => g.Collection.Payloads.Count) <= this._queueSize)
+            if (ls.HasValue && (ls.Value > DateTime.UtcNow.AddMinutes(-this._queueRetentionMinutes)))
             {
-                return;
-            }
+                repo = await _persistentStorage.Get();
+
+                if (repo.Sum(g => g.Collection.Payloads.Count) < this._queueSize)
+                {
+                    return;
+                }
+            }     
+            
+            if (repo == null)
+            {
+                repo = await _persistentStorage.Get();
+            }       
 
             bool wasSuccessPublish = false;
 
@@ -270,7 +277,7 @@ namespace HamustroNClient
 
             if (wasSuccessPublish)
             {
-                _persistentStorage.LastSyncDateTime = DateTime.UtcNow;
+                await _persistentStorage.SetLastSyncDateTime(DateTime.UtcNow);
             }
         }
 

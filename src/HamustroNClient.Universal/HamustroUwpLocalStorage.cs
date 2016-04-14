@@ -16,27 +16,37 @@ namespace HamustroNClient.Universal
     public class HamustroUwpLocalStorage : IPersistentStorage
     {
         private const string CollectionFolderName = "coll";
+        private const string LastSyncDateTimeFileName = nameof(LastSyncDateTimeFileName);
         private static readonly StorageFolder RootFolder = ApplicationData.Current.LocalFolder;
-        private static readonly object LastSyncDateTimeLock = new object();
+        private static readonly ReaderWriterLockSlim LastSyncDateTimeLock = new ReaderWriterLockSlim();
         private static readonly ReaderWriterLockSlim CollectionLock = new ReaderWriterLockSlim();
-
-        public DateTime? LastSyncDateTime
+        
+        public async Task SetLastSyncDateTime(DateTime dateTime)
         {
-            get
-            {
-                lock (LastSyncDateTimeLock)
-                {
-                    return this.GetItemFromStorage<DateTime?>(RootFolder, nameof(LastSyncDateTime)).Result; 
-                }
-            }
+            LastSyncDateTimeLock.EnterWriteLock();
 
-            set
+            try
             {
-                lock (LastSyncDateTimeLock)
-                {
-                    this.SetItemToStorage<DateTime?>(RootFolder, nameof(LastSyncDateTime), value).Wait(); 
-                }
+                await this.SetItemToStorage(RootFolder, LastSyncDateTimeFileName, dateTime);
             }
+            finally
+            {
+                LastSyncDateTimeLock.ExitWriteLock();
+            }
+        }
+
+        public async Task<DateTime?> GetLastSyncDateTime()
+        {
+            LastSyncDateTimeLock.EnterReadLock();
+
+            try
+            {
+                return await this.GetItemFromStorage<DateTime?>(RootFolder, LastSyncDateTimeFileName);
+            }
+            finally
+            {
+                LastSyncDateTimeLock.ExitReadLock();
+            }            
         }
 
         public async Task Add(SessionCollection eventCollection)
@@ -47,12 +57,15 @@ namespace HamustroNClient.Universal
             {
                 var cf = await GetCollectionsRoot();
 
-                var collection = await GetItemFromStorage<SessionCollection>(cf, eventCollection.SessionId);
+                var storedCollection = await GetItemFromStorage<SessionCollection>(cf, eventCollection.SessionId);
 
-                if (collection == default(SessionCollection))
+                if (storedCollection != default(SessionCollection))
                 {
-                    await SetItemToStorage(cf, eventCollection.SessionId, eventCollection);
-                }
+                    // merge payloads
+                    eventCollection.Collection.Payloads.AddRange(storedCollection.Collection.Payloads);
+                }                
+
+                await SetItemToStorage(cf, eventCollection.SessionId, eventCollection);
             }
             finally
             {
@@ -68,7 +81,7 @@ namespace HamustroNClient.Universal
             {
                 var cf = await GetCollectionsRoot();
 
-                var f = await cf.GetFileAsync(eventCollection.SessionId);
+                var f = await cf.TryGetItemAsync(eventCollection.SessionId);
 
                 if (f != null)
                 {
@@ -89,7 +102,7 @@ namespace HamustroNClient.Universal
             {
                 var cf = await GetCollectionsRoot();
 
-                var files = await cf.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByDate);
+                var files = await cf.GetFilesAsync();
 
                 return await Task.WhenAll(files.Select(async f => await DeSerializeFile<SessionCollection>(f)));
             }
@@ -106,7 +119,7 @@ namespace HamustroNClient.Universal
         
         private async Task<T> GetItemFromStorage<T>(StorageFolder folder, string fileName)
         {
-            var file = await folder.GetFileAsync(fileName);
+            var file = (StorageFile)await folder.TryGetItemAsync(fileName);
 
             if (file == null)
             {
@@ -138,6 +151,6 @@ namespace HamustroNClient.Universal
             {
                 serializer.WriteObject(fileContent, item);
             }
-        }
+        }        
     }
 }
