@@ -28,8 +28,6 @@ namespace HamustroNClient.Implementation
                 request.Method = HttpMethod.Post;
                 request.RequestUri = CollectorUri;
 
-                return true;
-
                 var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
                 return response.StatusCode == System.Net.HttpStatusCode.OK;

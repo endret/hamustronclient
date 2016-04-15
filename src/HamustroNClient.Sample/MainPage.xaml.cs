@@ -37,7 +37,7 @@ namespace HamustroNClient.Sample
             "1.0",
             "Szisztem",
             "GitHash",
-            2,
+            20,
             1440,
             new Universal.HamustroUwpLocalStorage(),
             new ProtoHttpEventPublisher(collectorUri),
@@ -48,11 +48,26 @@ namespace HamustroNClient.Sample
             this.InitializeComponent();
 
             tracker.GenerateSession();
+
+            this.RefreshData();
         }
         
         private async void Send()
         {            
             await tracker.TrackEvent(eventName.Text, 123u, "params", true);
-        }       
+
+            this.RefreshData();       
+        }   
+
+        private async void RefreshData()
+        {
+            var d = await tracker.LoadLastSyncTime();
+
+            this.lastSync.Text = "LastSyncTime: " + (d == null ? "-" : d.Value.ToLocalTime().ToString("O"));
+
+            var i = await tracker.LoadNumberPerSession();
+
+            this.payLoadCount.Text = "NumberPerSession: " + i;
+        }
     }
 }

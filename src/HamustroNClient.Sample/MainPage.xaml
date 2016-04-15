@@ -15,7 +15,10 @@
                     EventName
             </TextBlock>
             <TextBox TextWrapping="Wrap" x:Name="eventName" />
-            <Button Content="Send" Margin="0,10,0,0" Click="{x:Bind Send}" />                        
+            <Button Content="Send" Margin="0,10,0,0" Click="{x:Bind Send}" />
+            <!--Content="{x:Bind Path=ViewModel.NextButtonText, Mode=OneWay}"-->
+            <TextBlock x:Name="lastSync" TextWrapping="Wrap" />
+            <TextBlock x:Name="payLoadCount" TextWrapping="Wrap" />
         </StackPanel>
     </Grid>
 </Page>
